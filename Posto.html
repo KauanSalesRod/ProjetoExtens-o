@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard de Combustíveis - Cariacica</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f4f6f9;
+      color: #333;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: #ffffff;
+      padding: 25px;
+      border-radius: 10px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+    }
+
+    header {
+      margin-bottom: 25px;
+      border-bottom: 2px solid #eef2f7;
+      padding-bottom: 15px;
+    }
+
+    h1 {
+      color: #1a252f;
+      font-size: 26px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    p.subtitle {
+      color: #7f8c8d;
+      font-size: 14px;
+      margin-top: 5px;
+    }
+
+    .cards {
+      display: flex;
+      gap: 15px;
+      margin-bottom: 25px;
+      flex-wrap: wrap;
+    }
+
+    .card {
+      flex: 1;
+      min-width: 200px;
+      padding: 15px;
+      background: #f8fafc;
+      border-left: 5px solid #2c3e50;
+      border-radius: 6px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+    }
+
+    .card h3 {
+      font-size: 13px;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .card p {
+      margin-top: 8px;
+      font-size: 22px;
+      font-weight: bold;
+      color: #1e293b;
+    }
+
+    .nav-tabs {
+      display: flex;
+      gap: 10px;
+      border-bottom: 2px solid #e2e8f0;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    .tab-button {
+      padding: 10px 18px;
+      background: none;
+      border: none;
+      border-bottom: 3px solid transparent;
+      font-weight: 600;
+      font-size: 14px;
+      color: #64748b;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .tab-button:hover {
+      color: #2c3e50;
+    }
+
+    .tab-button.active {
+      color: #2563eb;
+      border-bottom-color: #2563eb;
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    .filter-container {
+      display: flex;
+      gap: 15px;
+      align-items: center;
+      background: #f1f5f9;
+      padding: 12px;
+      border-radius: 6px;
+      margin-bottom: 15px;
+      flex-wrap: wrap;
+    }
+
+    .filter-container label {
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .filter-container select {
+      padding: 6px 12px;
+      border-radius: 4px;
+      border: 1px solid #cbd5e1;
+      font-size: 14px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+
+    th,
+    td {
+      border: 1px solid #e2e8f0;
+      padding: 12px;
+      text-align: left;
+      font-size: 14px;
+    }
+
+    th {
+      background-color: #1e293b;
+      color: #ffffff;
+      font-weight: 600;
+    }
+
+    tr:nth-child(even) {
+      background-color: #f8fafc;
+    }
+
+    .chart-box {
+      margin-top: 20px;
+      position: relative;
+      height: 380px;
+    }
+
+    .error-msg {
+      color: #dc2626;
+      font-weight: bold;
+      padding: 10px;
+    }
+  </style>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+
+  <div class="container">
+    <header>
+      <h1>⛽ Monitorização de Preços de Combustíveis</h1>
+      <p class="subtitle">Projeto de Extensão - Arquitetura de Dados Relacionais I</p>
+    </header>
+
+    <div class="cards">
+      <div class="card">
+        <h3>Média Gasolina</h3>
+        <p id="media-gasolina">R$ --</p>
+      </div>
+      <div class="card">
+        <h3>Média Etanol</h3>
+        <p id="media-etanol">R$ --</p>
+      </div>
+      <div class="card">
+        <h3>Total de Amostras</h3>
+        <p id="total-coletas">--</p>
+      </div>
+    </div>
+
+    <div class="nav-tabs">
+      <button class="tab-button active" onclick="switchTab('consulta1', this)">I. Menor e Maior Preço</button>
+      <button class="tab-button" onclick="switchTab('consulta2', this)">II. Médias e Amostras por Posto</button>
+      <button class="tab-button" onclick="switchTab('consulta3', this)">III. Preço Mais Recente</button>
+      <button class="tab-button" onclick="switchTab('consulta4', this)">IV. Evolução Temporal</button>
+    </div>
+
+    <div id="consulta1" class="tab-content active">
+      <h2>I. Menor e Maior Preço de Cada Tipo de Combustível</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Combustível</th>
+            <th>Tipo</th>
+            <th>Posto</th>
+            <th>Endereço</th>
+            <th>Bairro</th>
+            <th>Preço (R$)</th>
+            <th>Data Coleta</th>
+          </tr>
+        </thead>
+        <tbody id="tb-consulta1">
+          <tr>
+            <td colspan="7">A carregar dados...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div id="consulta2" class="tab-content">
+      <h2>II. Amostras e Preço Médio por Posto e Combustível</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Posto</th>
+            <th>Bairro</th>
+            <th>Combustível</th>
+            <th>Qtd. Amostras</th>
+            <th>Preço Médio (R$)</th>
+          </tr>
+        </thead>
+        <tbody id="tb-consulta2">
+          <tr>
+            <td colspan="5">A carregar dados...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div id="consulta3" class="tab-content">
+      <h2>III. Último Preço Registado por Posto e Combustível</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Posto</th>
+            <th>Bairro</th>
+            <th>Combustível</th>
+            <th>Preço Recente (R$)</th>
+            <th>Data da Coleta</th>
+          </tr>
+        </thead>
+        <tbody id="tb-consulta3">
+          <tr>
+            <td colspan="5">A carregar dados...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div id="consulta4" class="tab-content">
+      <h2>IV. Evolução do Preço ao Longo do Tempo</h2>
+
+      <div class="filter-container">
+        <label for="selPosto">Selecione o Posto:</label>
+        <select id="selPosto" onchange="executarConsulta4()"></select>
+
+        <label for="selCombustivel">Combustível:</label>
+        <select id="selCombustivel" onchange="executarConsulta4()"></select>
+      </div>
+
+      <div class="chart-box">
+        <canvas id="graficoEvolucao"></canvas>
+      </div>
+
+      <table style="margin-top: 25px;">
+        <thead>
+          <tr>
+            <th>Posto</th>
+            <th>Bairro</th>
+            <th>Combustível</th>
+            <th>Valor (R$)</th>
+            <th>Data da Coleta</th>
+          </tr>
+        </thead>
+        <tbody id="tb-consulta4">
+          <tr>
+            <td colspan="5">Selecione as opções acima para visualizar.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+
+  <script>
+    const SUPABASE_URL = 'https://jbyzujlgucfcyatijash.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpieXp1amxndWNmY3lhdGlqYXNoIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4ODIyNTA3MSwiZXhwIjoyMTAzODAxMDcxfQ.aZKPFOVFXVvPp1EZQK-5Q7fNstJBFWqBitXcoazI3l4';
+
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    let todosDados = [];
+    let meuGrafico = null;
+
+    function switchTab(tabId, btn) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.tab-button').forEach(el => el.classList.remove('active'));
+
+      document.getElementById(tabId).classList.add('active');
+      btn.classList.add('active');
+
+      if (tabId === 'consulta4') {
+        executarConsulta4();
+      }
+    }
+
+    function formatarData(dataISO) {
+      if (!dataISO) return 'N/A';
+      const p = dataISO.split('-');
+      return `${p[2]}/${p[1]}/${p[0]}`;
+    }
+
+    async function carregarDadosIniciais() {
+      const { data, error } = await supabaseClient
+        .from('historico_preco')
+        .select(`
+          id_historico,
+          preco_venda,
+          data_coleta,
+          id_posto,
+          id_tipo_combustivel,
+          posto ( id_posto, nome_posto, endereco, bairro ),
+          tipo_combustivel ( id_tipo_combustivel, nome_combustivel )
+        `)
+        .order('data_coleta', { ascending: true });
+
+      if (error) {
+        console.error('Erro ao consultar Supabase:', error);
+        document.getElementById('tb-consulta1').innerHTML = `<tr><td colspan="7" class="error-msg">Erro: ${error.message}</td></tr>`;
+        return;
+      }
+
+      todosDados = data;
+
+      atualizarCards();
+      executarConsulta1();
+      executarConsulta2();
+      executarConsulta3();
+      popularFiltrosConsulta4();
+    }
+
+    function atualizarCards() {
+      let somaGas = 0, qGas = 0;
+      let somaEta = 0, qEta = 0;
+
+      todosDados.forEach(item => {
+        const val = parseFloat(item.preco_venda) || 0;
+        const nomeComb = item.tipo_combustivel ? item.tipo_combustivel.nome_combustivel.toUpperCase() : '';
+
+        if (nomeComb.includes('GASOLINA') && !nomeComb.includes('ADITIVADA')) {
+          somaGas += val;
+          qGas++;
+        } else if (nomeComb.includes('ETANOL')) {
+          somaEta += val;
+          qEta++;
+        }
+      });
+
+      document.getElementById('media-gasolina').innerText = qGas ? `R$ ${(somaGas / qGas).toFixed(2)}` : 'N/A';
+      document.getElementById('media-etanol').innerText = qEta ? `R$ ${(somaEta / qEta).toFixed(2)}` : 'N/A';
+      document.getElementById('total-coletas').innerText = todosDados.length;
+    }
+
+    function executarConsulta1() {
+      const tb = document.getElementById('tb-consulta1');
+      tb.innerHTML = '';
+
+      const porCombustivel = {};
+
+      todosDados.forEach(item => {
+        const comb = item.tipo_combustivel ? item.tipo_combustivel.nome_combustivel : 'Outros';
+        if (!porCombustivel[comb]) porCombustivel[comb] = [];
+        porCombustivel[comb].push(item);
+      });
+
+      Object.keys(porCombustivel).forEach(comb => {
+        const lista = porCombustivel[comb];
+        lista.sort((a, b) => parseFloat(a.preco_venda) - parseFloat(b.preco_venda));
+
+        const menor = lista[0];
+        const maior = lista[lista.length - 1];
+
+        const renderRow = (item, rotulo) => `
+          <tr>
+            <td><strong>${comb}</strong></td>
+            <td>${rotulo}</td>
+            <td>${item.posto ? item.posto.nome_posto : 'N/A'}</td>
+            <td>${item.posto ? item.posto.endereco || 'N/A' : 'N/A'}</td>
+            <td>${item.posto ? item.posto.bairro || 'N/A' : 'N/A'}</td>
+            <td><strong>R$ ${parseFloat(item.preco_venda).toFixed(2)}</strong></td>
+            <td>${formatarData(item.data_coleta)}</td>
+          </tr>
+        `;
+
+        tb.innerHTML += renderRow(menor, '📉 Menor Preço');
+        tb.innerHTML += renderRow(maior, '📈 Maior Preço');
+      });
+    }
+
+    function executarConsulta2() {
+      const tb = document.getElementById('tb-consulta2');
+      tb.innerHTML = '';
+
+      const grupos = {};
+
+      todosDados.forEach(item => {
+        const pNome = item.posto ? item.posto.nome_posto : 'N/A';
+        const pBairro = item.posto ? item.posto.bairro : 'N/A';
+        const cNome = item.tipo_combustivel ? item.tipo_combustivel.nome_combustivel : 'N/A';
+        const chave = `${pNome}|${pBairro}|${cNome}`;
+
+        if (!grupos[chave]) {
+          grupos[chave] = { posto: pNome, bairro: pBairro, combustivel: cNome, soma: 0, qtd: 0 };
+        }
+
+        grupos[chave].soma += parseFloat(item.preco_venda);
+        grupos[chave].qtd += 1;
+      });
+
+      Object.values(grupos).forEach(g => {
+        const media = (g.soma / g.qtd).toFixed(2);
+        tb.innerHTML += `
+          <tr>
+            <td>${g.posto}</td>
+            <td>${g.bairro}</td>
+            <td>${g.combustivel}</td>
+            <td>${g.qtd}</td>
+            <td><strong>R$ ${media}</strong></td>
+          </tr>
+        `;
+      });
+    }
+
+    function executarConsulta3() {
+      const tb = document.getElementById('tb-consulta3');
+      tb.innerHTML = '';
+
+      const recentes = {};
+
+      todosDados.forEach(item => {
+        const pNome = item.posto ? item.posto.nome_posto : 'N/A';
+        const pBairro = item.posto ? item.posto.bairro : 'N/A';
+        const cNome = item.tipo_combustivel ? item.tipo_combustivel.nome_combustivel : 'N/A';
+        const chave = `${pNome}|${cNome}`;
+
+        recentes[chave] = {
+          posto: pNome,
+          bairro: pBairro,
+          combustivel: cNome,
+          valor: parseFloat(item.preco_venda).toFixed(2),
+          data: item.data_coleta
+        };
+      });
+
+      Object.values(recentes).forEach(r => {
+        tb.innerHTML += `
+          <tr>
+            <td>${r.posto}</td>
+            <td>${r.bairro}</td>
+            <td>${r.combustivel}</td>
+            <td><strong>R$ ${r.valor}</strong></td>
+            <td>${formatarData(r.data)}</td>
+          </tr>
+        `;
+      });
+    }
+
+    function popularFiltrosConsulta4() {
+      const selP = document.getElementById('selPosto');
+      const selC = document.getElementById('selCombustivel');
+
+      const postos = [...new Set(todosDados.map(d => d.posto ? d.posto.nome_posto : null).filter(Boolean))];
+      const combustiveis = [...new Set(todosDados.map(d => d.tipo_combustivel ? d.tipo_combustivel.nome_combustivel : null).filter(Boolean))];
+
+      selP.innerHTML = postos.map(p => `<option value="${p}">${p}</option>`).join('');
+      selC.innerHTML = combustiveis.map(c => `<option value="${c}">${c}</option>`).join('');
+    }
+
+    function executarConsulta4() {
+      const postoSel = document.getElementById('selPosto').value;
+      const combSel = document.getElementById('selCombustivel').value;
+      const tb = document.getElementById('tb-consulta4');
+
+      tb.innerHTML = '';
+
+      const filtrados = todosDados.filter(d => {
+        const pMatch = d.posto && d.posto.nome_posto === postoSel;
+        const cMatch = d.tipo_combustivel && d.tipo_combustivel.nome_combustivel === combSel;
+        return pMatch && cMatch;
+      });
+
+      filtrados.sort((a, b) => new Date(a.data_coleta) - new Date(b.data_coleta));
+
+      if (filtrados.length === 0) {
+        tb.innerHTML = '<tr><td colspan="5">Nenhum registo encontrado para este filtro.</td></tr>';
+        if (meuGrafico) meuGrafico.destroy();
+        return;
+      }
+
+      const labels = [];
+      const valores = [];
+
+      filtrados.forEach(f => {
+        const dataFmt = formatarData(f.data_coleta);
+        const val = parseFloat(f.preco_venda);
+
+        labels.push(dataFmt);
+        valores.push(val);
+
+        tb.innerHTML += `
+          <tr>
+            <td>${f.posto.nome_posto}</td>
+            <td>${f.posto.bairro}</td>
+            <td>${f.tipo_combustivel.nome_combustivel}</td>
+            <td><strong>R$ ${val.toFixed(2)}</strong></td>
+            <td>${dataFmt}</td>
+          </tr>
+        `;
+      });
+
+      const ctx = document.getElementById('graficoEvolucao').getContext('2d');
+      if (meuGrafico) meuGrafico.destroy();
+
+      meuGrafico = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: `${combSel} - ${postoSel}`,
+            data: valores,
+            borderColor: '#2563eb',
+            backgroundColor: 'rgba(37, 99, 235, 0.1)',
+            borderWidth: 3,
+            fill: true,
+            tension: 0.2
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: {
+              beginAtZero: false,
+              title: { display: true, text: 'Preço (R$)' }
+            }
+          }
+        }
+      });
+    }
+
+    carregarDadosIniciais();
+  </script>
+</body>
+
+</html>
